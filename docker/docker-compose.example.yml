@@ -1,0 +1,19 @@
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      # host 5555 -> container 5678. Point your tunnel (ngrok) at 5555.
+      - "5555:5678"
+    environment:
+      - WEBHOOK_URL=https://YOUR-DOMAIN.ngrok-free.dev/
+      - N8N_EDITOR_BASE_URL=https://YOUR-DOMAIN.ngrok-free.dev/
+      - GENERIC_TIMEZONE=Africa/Casablanca
+      - TZ=Africa/Casablanca
+      # Receipt photos are stored on disk instead of memory/DB
+      - N8N_DEFAULT_BINARY_DATA_MODE=filesystem
+      # Lets community nodes be used as AI agent tools
+      - N8N_COMMUNITY_PACKAGE_ALLOW_TOOL_USAGE=true
+    volumes:
+      - ./data:/home/node/.n8n

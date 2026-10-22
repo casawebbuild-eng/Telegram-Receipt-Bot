@@ -1,0 +1,36 @@
+# n8n runtime data: database, encryption key, event logs, binary files
+data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+n8nEventLog*.log
+crash.journal
+storage/
+nodes/
+config
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Raw, unsanitized exports. Only the sanitized copies in workflows/ belong in git.
+Telegram_Bot.json
+Receipt_Weekly_Summary.json
+*.live.json
+*.raw.json
+
+# Backups
+*.tgz
+*.zip
+*.bak
+
+# Unblurred screenshots
+docs/images/raw/
+
+# OS / editor
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/

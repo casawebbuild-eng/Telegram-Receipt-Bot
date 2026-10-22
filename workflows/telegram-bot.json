@@ -1,0 +1,752 @@
+{
+  "name": "Telegram Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        32,
+        -48
+      ],
+      "id": "7d133664-d3b6-48bf-bda7-c4db7fa2cf46",
+      "name": "Telegram Trigger",
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.photo.last().file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        592,
+        -272
+      ],
+      "id": "854cccdd-b977-4d01-9973-a5e19e8e664c",
+      "name": "Get a file",
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash-lite",
+          "mode": "list",
+          "cachedResultName": "Gemini 2.5 Flash-Lite"
+        },
+        "text": "=You extract data from a photo of a purchase receipt and write a short reply to the person who sent it.\n\nYour ENTIRE response must be ONE JSON object and nothing else. It must start with { and end with }. No markdown fences, no text before or after the object. The reply text goes INSIDE the \"reply\" field of the object, never outside it.\n\nShape of the object:\n{\"merchant\": string or null, \"date\": \"YYYY-MM-DD\" or null, \"total\": number or null, \"currency\": string or null, \"category\": string, \"reply\": string}\n\nField rules:\n- merchant: the store name as printed at the top of the receipt, original spelling.\n- date: the purchase date as YYYY-MM-DD. Receipts from Morocco and France print dates as DD/MM/YYYY; interpret them that way.\n- total: the final amount paid (TOTAL, TOTAL TTC, NET A PAYER, MONTANT, المجموع). A plain number with a dot decimal, no currency symbol, no thousands separators. Never the subtotal, tax, amount tendered, or change (RENDU).\n- currency: ISO 4217 code. DH, Dhs, MAD and درهم all mean MAD.\n- category: exactly one of: groceries, restaurant, transport, health, shopping, bills, other.\n- If the image is not a receipt, or the date or total cannot be read with confidence, set that field to null. Never guess a value.\n\nRules for the \"reply\" field only:\n- English, calm and professional. No emoji, no exclamation marks, no filler.\n- If the date and total were both read, reply is four lines separated by \\n, in this order: \"Total: <total with two decimals>\", \"Category: <category with a capital first letter>\", \"Currency: <currency code, or Unknown if null>\", \"Date: <date written like 19 Oct 2026>\". Use exactly the values from the fields above.\n- If the date or total could not be read, or the image is not a receipt, reply is one short sentence saying what could not be read (or that it is not a receipt) and asking for a clearer photo with the total and date in frame.\n\nExample of a complete valid response for a readable receipt:\n{\"merchant\": \"GALERIE LOKMANE\", \"date\": \"2026-10-19\", \"total\": 100, \"currency\": \"MAD\", \"category\": \"shopping\", \"reply\": \"Total: 100.00\\nCategory: Shopping\\nCurrency: MAD\\nDate: 19 Oct 2026\"}",
+        "inputType": "binary",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        752,
+        -272
+      ],
+      "id": "ce60498c-ec5d-4a46-a90d-9d3c7ee281a9",
+      "name": "Analyze an image",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Receipts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 0,
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date": "={{ JSON.parse($('Analyze an image').item.json.content.parts[0].text.replace(/```(json)?/g, '').trim()).date }} ",
+            "merchant": "={{ JSON.parse($('Analyze an image').item.json.content.parts[0].text.replace(/```(json)?/g, '').trim()).merchant }}",
+            "total": "={{ JSON.parse($('Analyze an image').item.json.content.parts[0].text.replace(/```(json)?/g, '').trim()).total }}",
+            "currency": "={{ JSON.parse($('Analyze an image').item.json.content.parts[0].text.replace(/```(json)?/g, '').trim()).currency }}",
+            "category": "={{ JSON.parse($('Analyze an image').item.json.content.parts[0].text.replace(/```(json)?/g, '').trim()).category }}",
+            "message_id": "={{ $('Telegram Trigger').item.json.message.message_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "merchant",
+              "displayName": "merchant",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total",
+              "displayName": "total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "currency",
+              "displayName": "currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message_id",
+              "displayName": "message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1264,
+        -416
+      ],
+      "id": "2dde51e3-7bfd-4181-92c9-a31f9fa7f7f2",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ (() => { const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); try { const r = JSON.parse($('Analyze an image').item.json.content.parts[0].text.replace(/```(json)?/g, '').trim()); if (r.reply) return esc(r.reply); } catch (e) {} return \"Couldn't read that one. Send a clearer photo with the total and date in frame.\"; })() }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        -224
+      ],
+      "id": "8be1bb44-400b-4415-a777-bdba67d6fe12",
+      "name": "Error",
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ (() => { const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); const r = JSON.parse($('Analyze an image').item.json.content.parts[0].text.replace(/```(json)?/g, '').trim()); const head = r.merchant ? `<b>${esc(r.merchant)}</b>\\n` : ''; return head + esc(r.reply || `${r.total.toFixed(2)} ${r.currency || ''}`); })() }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1104,
+        -416
+      ],
+      "id": "d7aeac05-dd1b-412e-8565-c3e8f8dedd92",
+      "name": "Success",
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "8ed4dea5-35c4-47e7-bbee-8b12dc30e07a",
+              "leftValue": "={{ Array.isArray($json.message?.photo) && $json.message.photo.length > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        192,
+        -48
+      ],
+      "id": "1ec28378-86cc-4603-a4fb-567c7c47ecc7",
+      "name": "Is Photo"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Telegram Trigger').item.json.message.text }}",
+        "options": {
+          "systemMessage": "=Today is {{ $now.toFormat('cccc, yyyy-MM-dd') }}. Weeks start on Monday.\n\nYou answer the owner's questions about their logged receipts. The Receipts sheet has columns: date (YYYY-MM-DD), merchant, total, currency, category, message_id.\n\nRules:\n- For any question about spending or payments, ALWAYS call the sheet tool first. Never answer from memory and never invent receipts.\n- Read all rows, then keep only the rows inside the day or period asked. Interpret dates like 19/10 as day/month.\n- List each matching receipt on its own line as: Merchant: 100.00 MAD (category). Then a final line: Total: 100.00 MAD. If several currencies appear, give one Total line per currency and NEVER add different currencies together.\n- If no rows match, say: No payments logged for <the period>.\n- If the question names no day or period, ask which one.\n- For anything else, answer in one short sentence.\n- Plain text only. No markdown, no emoji, no exclamation marks. Calm and professional."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        656,
+        48
+      ],
+      "id": "fc9ac0bc-1504-410e-8758-f6783950806f",
+      "name": "AI Agent",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        656,
+        224
+      ],
+      "id": "786d48e9-087f-413f-b04f-7b6b244404c2",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Receipts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 0,
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        800,
+        240
+      ],
+      "id": "dda666e5-a8ee-4d3e-a4ce-58358a2c8096",
+      "name": "Receipts",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "26636e5e-95b8-4fd6-89cf-65ca872e3925",
+              "leftValue": "={{ (() => { try { const r = JSON.parse($json.content.parts[0].text.replace(/```(json)?/g, '').trim()); return typeof r.total === 'number' && r.total > 0 && !isNaN(r.total) && !!r.date && DateTime.fromISO(r.date).isValid; } catch (e) { return false; } })() }}",
+              "rightValue": "={{ (() => { try { const r = JSON.parse($json.content.parts[0].text.replace(/```(json)?/g, '').trim()); return typeof r.total === 'number' && r.total > 0 && !isNaN(r.total) && !!r.date && DateTime.fromISO(r.date).isValid; } catch (e) { return false; } })() }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        928,
+        -352
+      ],
+      "id": "81bc5aa5-6057-44c8-8e92-1e99ef55ca89",
+      "name": "Success Or Error"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ String($json.output).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        976,
+        -32
+      ],
+      "id": "0facebee-e5e0-4398-8791-be68efa5c83e",
+      "name": "Success1",
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ /many requests|429|quota|rate/i.test(JSON.stringify($json)) ? \"I've hit my usage limit. Try again in a minute.\" : \"I ran into a problem answering that. Try again in a minute.\" }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        976,
+        128
+      ],
+      "id": "fb1e5ad0-63fb-4bca-a791-5f3d2bf59dec",
+      "name": "Error1",
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Telegram Bot",
+        "height": 1056,
+        "width": 1472,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        -432
+      ],
+      "id": "b176f0ac-2acc-4730-878c-8876f038722e",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "<b>ACCESS DENIED.</b>  \n<b>This is a private system. You are not authorized to use it.</b>  \n<b>Your attempt has been recorded. Do not message this bot again.</b>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        592,
+        -112
+      ],
+      "id": "063c28bd-a617-4d86-b27f-45a0b00d9fdf",
+      "name": "Not Owner",
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "<b>ACCESS DENIED.</b>  \n<b>This is a private system. You are not authorized to use it.</b>  \n<b>Your attempt has been recorded. Do not message this bot again.</b>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        656,
+        400
+      ],
+      "id": "0e654638-1a60-46cf-8b2e-9fb77dc82b05",
+      "name": "Not Owner1",
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "4ba999e5-11a3-4d61-a910-db022b5d8145",
+              "leftValue": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+              "rightValue": "YOUR_CHAT_ID",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        432,
+        240
+      ],
+      "id": "ae54da6a-442c-494c-8a95-af3904dba3b0",
+      "name": "Is Owner1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "4ba999e5-11a3-4d61-a910-db022b5d8145",
+              "leftValue": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+              "rightValue": "YOUR_CHAT_ID",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        416,
+        -192
+      ],
+      "id": "0a636577-ada2-4aff-86b6-f23bc7430e5c",
+      "name": "Is Owner"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ /many requests|429|quota/i.test(String($json.error ?? '')) ? \"I've hit my usage limit. Try again in a minute.\" : \"I ran into a problem answering that. Try again in a minute.\" }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        976,
+        -176
+      ],
+      "id": "665e48ab-6cc5-415d-a5ba-7025e6b8d48f",
+      "name": "Error2",
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Is Photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a file": {
+      "main": [
+        [
+          {
+            "node": "Analyze an image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze an image": {
+      "main": [
+        [
+          {
+            "node": "Success Or Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Photo": {
+      "main": [
+        [
+          {
+            "node": "Is Owner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Owner1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Success1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receipts": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success Or Error": {
+      "main": [
+        [
+          {
+            "node": "Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Owner1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Not Owner1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Owner": {
+      "main": [
+        [
+          {
+            "node": "Get a file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Not Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}
