@@ -12,14 +12,22 @@ Built with n8n (self-hosted), Google Gemini, Google Sheets and the Telegram Bot 
 - **Answers questions.** Ask "what did I spend on 19 Oct?" and an AI agent reads the sheet and replies with the matching receipts and a total.
 - **Stays private.** Only the owner's Telegram chat ID is served. Everyone else gets a fixed refusal, on both the photo and the text paths.
 
+## Workflows
+
+**Telegram Bot.** Receipts, chat questions, the owner lock and the error paths, in one workflow.
+
+![Telegram Bot workflow](docs/images/canvas-bot.png)
+
+**Receipt Weekly Summary.** Reads the sheet on a schedule and sends one message.
+
+![Receipt Weekly Summary workflow](docs/images/canvas-weekly.png)
+
 <!--
-Uncomment after adding the files to docs/images/ (blur any personal data first):
+Add these after saving the files to docs/images/ (blur any personal data first):
 
 | Receipt confirmation | Chat answer |
 | --- | --- |
 | ![Confirmation](docs/images/confirmation.png) | ![Chat answer](docs/images/chat-answer.png) |
-
-![Workflow canvas](docs/images/canvas.png)
 -->
 
 ## How it works
@@ -112,7 +120,7 @@ docker/
   docker-compose.example.yml
 docs/
   sheet-template.csv       header row for the Google Sheet
-  images/                  screenshots
+  images/                  workflow screenshots
 scripts/
   check-secrets.ps1        scan before pushing
 ```
